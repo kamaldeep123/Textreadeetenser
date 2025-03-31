@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TensorFlow.js Text Reader</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Import TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0"></script>
+    <!-- Import TensorFlow.js text model (Universal Sentence Encoder) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder"></script>
+    <!-- Import PDF.js for PDF text extraction -->
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
+    <!-- Import Mammoth.js for DOCX text extraction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>TensorFlow.js Text Reader</h1>
+        <div class="input-section">
+            <h2>Input Text</h2>
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="text-input">Text Input</button>
+                <button class="tab-btn" data-tab="file-upload">File Upload</button>
+            </div>
+            <div class="tab-content active" id="text-input">
+                <textarea id="input-text" placeholder="Enter your text here..."></textarea>
+            </div>
+            <div class="tab-content" id="file-upload">
+                <div class="file-upload-container">
+                    <label for="file-input" class="file-upload-label">
+                        <span>Choose a file</span>
+                        <span class="file-types">(PDF, TXT, DOCX)</span>
+                    </label>
+                    <input type="file" id="file-input" accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                    <div id="file-info" class="hidden">
+                        <span id="file-name"></span>
+                        <button id="clear-file">Clear</button>
+                    </div>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button id="process-btn">Process Text</button>
+                <button id="read-btn">Read Text Aloud</button>
+            </div>
+        </div>
+        <div class="output-section">
+            <h2>Analysis Results</h2>
+            <div id="loading" class="hidden">Loading model and processing text...</div>
+            <div id="results">
+                <div class="result-item">
+                    <h3>Text Embeddings</h3>
+                    <pre id="embeddings-output">Process text to see embeddings...</pre>
+                </div>
+                <div class="result-item">
+                    <h3>Sentiment Score</h3>
+                    <div id="sentiment-output">Process text to see sentiment analysis...</div>
+                </div>
+                <div class="result-item">
+                    <h3>Text Statistics</h3>
+                    <div id="stats-output">Process text to see statistics...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Library scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+    <script src="pdf.js"></script>
+    <script src="enhanced-pdf.js"></script>
+    <script src="docx.js"></script>
+    <script src="enhanced-docx.js"></script>
+    <script src="file-handler.js"></script>
+    <script src="test-upload.js"></script>
+    <script src="test-pdf.js"></script>
+    <script src="test-docx.js"></script>
+    <!-- Application scripts -->
+    <script src="text-to-speech.js"></script>
+    <script src="enhanced-text-to-speech.js"></script>
+    <script src="key-phrases.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
