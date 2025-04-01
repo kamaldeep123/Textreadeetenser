@@ -1,206 +1,247 @@
-/**
- * Enhanced Text-to-Speech functionality for TensorFlow.js Text Reader
- * Uses Web Speech API with improved voice selection and natural speech parameters
- */
+// Enhanced Text-to-Speech functionality with natural voice and UTC timestamp reading
+let voices = [];
+let isSpeaking = false;
+let currentDateTime = '';
 
-// Initialize text-to-speech functionality
-function setupTextToSpeech() {
-    // Get DOM elements
-    const readBtn = document.getElementById('read-btn');
-    const inputText = document.getElementById('input-text');
+// Format and update datetime in UTC
+function updateDateTime() {
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(now.getUTCDate()).padStart(2, '0');
+    const hours = String(now.getUTCHours()).padStart(2, '0');
+    const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(now.getUTCSeconds()).padStart(2, '0');
     
-    // Check if browser supports speech synthesis
-    if ('speechSynthesis' in window) {
-        // Add event listener to the read button
-        readBtn.addEventListener('click', () => {
-            const text = inputText.value.trim();
-            
-            if (text) {
-                speakText(text);
-            } else {
-                alert('Please enter or upload some text to read aloud.');
+    currentDateTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    
+    // Update display if element exists
+    const datetimeElement = document.getElementById('datetime');
+    if (datetimeElement) {
+        datetimeElement.textContent = currentDateTime;
+    }
+    
+    return currentDateTime;
+}
+
+// Convert datetime to natural speech format
+function formatDateTimeForSpeech(dateTimeStr) {
+    const [datePart, timePart] = dateTimeStr.split(' ');
+    const [year, month, day] = datePart.split('-');
+    const [hours, minutes, seconds] = timePart.split(':');
+    
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    // Convert to more natural speech format
+    return `The current UTC time is ${hours}:${minutes} and ${seconds} seconds on ${monthNames[parseInt(month) - 1]} ${parseInt(day)}, ${year}`;
+}
+
+// Initialize voice system with preference for natural voices
+function loadVoices() {
+    return new Promise((resolve) => {
+        const loadVoiceList = () => {
+            voices = window.speechSynthesis.getVoices();
+            if (voices.length > 0) {
+                resolve(voices);
             }
-        });
+        };
         
-        // Enable the read button
-        readBtn.disabled = false;
-    } else {
-        // Browser doesn't support speech synthesis
-        readBtn.disabled = true;
-        readBtn.textContent = 'Text-to-Speech Not Supported';
-        console.error('This browser does not support the Web Speech API');
-    }
-}
-
-// Enhanced speak function with improved voice selection and natural parameters
-function speakText(text) {
-    // Create a new speech synthesis utterance
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Get available voices
-    let voices = speechSynthesis.getVoices();
-    
-    // If voices array is empty, wait for voices to load
-    if (voices.length === 0) {
-        speechSynthesis.addEventListener('voiceschanged', () => {
-            voices = speechSynthesis.getVoices();
-            setVoiceAndSpeak(utterance, voices);
-        });
-    } else {
-        setVoiceAndSpeak(utterance, voices);
-    }
-}
-
-// Helper function to set voice and speech parameters
-function setVoiceAndSpeak(utterance, voices) {
-    // Find a good quality voice - prioritize natural sounding voices
-    let selectedVoice = null;
-    
-    // First try to find a premium/enhanced voice
-    for (const voice of voices) {
-        if (voice.name.includes('Premium') || 
-            voice.name.includes('Enhanced') || 
-            voice.name.includes('Neural') ||
-            voice.localService === false) { // Non-local voices are often higher quality
-            selectedVoice = voice;
-            break;
+        loadVoiceList();
+        if (voices.length === 0) {
+            window.speechSynthesis.onvoiceschanged = loadVoiceList;
         }
-    }
-    
-    // If no premium voice found, try to find a good English voice
-    if (!selectedVoice) {
-        for (const voice of voices) {
-            if (voice.lang.startsWith('en-')) {
-                selectedVoice = voice;
-                break;
+    });
+}
+
+// Set up voice selection interface with priority for natural voices
+async function setupVoiceSelector() {
+    try {
+        await loadVoices();
+        
+        if (!document.getElementById('voice-select')) {
+            const voiceSelect = document.createElement('select');
+            voiceSelect.id = 'voice-select';
+            voiceSelect.style.cssText = `
+                margin: 10px;
+                padding: 8px;
+                border-radius: 4px;
+                border: 1px solid #ccc;
+                font-size: 14px;
+                min-width: 200px;
+            `;
+            
+            // Filter and prioritize natural voices
+            const naturalVoices = voices.filter(voice => 
+                voice.name.includes('Neural') ||
+                voice.name.includes('Natural') ||
+                voice.name.includes('Premium') ||
+                voice.name.toLowerCase().includes('samantha') ||
+                voice.name.toLowerCase().includes('daniel')
+            );
+            
+            const otherVoices = voices.filter(voice => !naturalVoices.includes(voice));
+            
+            // Add natural voices group
+            if (naturalVoices.length > 0) {
+                const naturalGroup = document.createElement('optgroup');
+                naturalGroup.label = 'Natural Voices';
+                naturalVoices.forEach(voice => addVoiceOption(naturalGroup, voice));
+                voiceSelect.appendChild(naturalGroup);
+            }
+            
+            // Add other voices group
+            const otherGroup = document.createElement('optgroup');
+            otherGroup.label = 'Other Voices';
+            otherVoices.forEach(voice => addVoiceOption(otherGroup, voice));
+            voiceSelect.appendChild(otherGroup);
+            
+            // Insert voice selector into DOM
+            const controlsContainer = document.createElement('div');
+            controlsContainer.id = 'tts-controls';
+            controlsContainer.style.cssText = 'margin: 20px 0; text-align: center;';
+            
+            const readButton = createReadButton();
+            
+            controlsContainer.appendChild(readButton);
+            controlsContainer.appendChild(voiceSelect);
+            
+            // Find appropriate place to insert controls
+            const datetimeElement = document.getElementById('datetime');
+            if (datetimeElement && datetimeElement.parentNode) {
+                datetimeElement.parentNode.insertBefore(controlsContainer, datetimeElement.nextSibling);
             }
         }
+    } catch (error) {
+        console.error('Error setting up voice selector:', error);
+    }
+}
+
+// Helper function to add voice options
+function addVoiceOption(group, voice) {
+    const option = document.createElement('option');
+    option.value = voice.name;
+    option.textContent = `${voice.name} (${voice.lang})`;
+    option.selected = voice.name.includes('Natural') || voice.name.includes('Neural');
+    group.appendChild(option);
+}
+
+// Create styled read button
+function createReadButton() {
+    const button = document.createElement('button');
+    button.id = 'read-btn';
+    button.textContent = 'Read Time Aloud';
+    button.style.cssText = `
+        padding: 10px 20px;
+        font-size: 14px;
+        color: white;
+        background-color: #4CAF50;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        margin-right: 10px;
+    `;
+    button.addEventListener('click', readCurrentInfo);
+    return button;
+}
+
+// Main function to read current information
+async function readCurrentInfo() {
+    if (isSpeaking) {
+        window.speechSynthesis.cancel();
+        isSpeaking = false;
+        updateReadButton();
+        return;
     }
     
-    // If still no voice found, use the first available voice
-    if (!selectedVoice && voices.length > 0) {
-        selectedVoice = voices[0];
-    }
+    // Update current time
+    updateDateTime();
     
-    // Set the selected voice
-    if (selectedVoice) {
-        utterance.voice = selectedVoice;
-    }
+    // Prepare natural speech text
+    const timeText = formatDateTimeForSpeech(currentDateTime);
+    const userText = `The current user is ${document.getElementById('userLogin').textContent}`;
+    const fullText = `${timeText}. ${userText}`;
     
-    // Set natural-sounding speech parameters
-    utterance.rate = 0.9;       // Slightly slower than default for better clarity
-    utterance.pitch = 1.0;      // Normal pitch
-    utterance.volume = 1.0;     // Full volume
+    // Get selected voice
+    const voiceSelect = document.getElementById('voice-select');
+    const selectedVoiceName = voiceSelect ? voiceSelect.value : null;
+    const selectedVoice = voices.find(voice => voice.name === selectedVoiceName) || 
+                         voices.find(voice => voice.name.includes('Natural')) ||
+                         voices[0];
     
-    // Add pauses at punctuation for more natural speech
-    const processedText = addPausesToText(utterance.text);
-    utterance.text = processedText;
+    // Create and configure utterance
+    const utterance = new SpeechSynthesisUtterance(fullText);
+    utterance.voice = selectedVoice;
+    utterance.rate = 0.9;  // Slightly slower for clarity
+    utterance.pitch = 1.0; // Natural pitch
+    utterance.volume = 1.0;
     
-    // Show speaking indicator
-    const readBtn = document.getElementById('read-btn');
-    const originalText = readBtn.textContent;
-    readBtn.textContent = 'Speaking...';
-    readBtn.disabled = true;
+    // Handle speech events
+    utterance.onstart = () => {
+        isSpeaking = true;
+        updateReadButton();
+    };
     
-    // Add event listeners for speech events
     utterance.onend = () => {
-        // Reset button when speech ends
-        readBtn.textContent = originalText;
-        readBtn.disabled = false;
+        isSpeaking = false;
+        updateReadButton();
     };
     
     utterance.onerror = (event) => {
         console.error('Speech synthesis error:', event);
-        readBtn.textContent = originalText;
-        readBtn.disabled = false;
+        isSpeaking = false;
+        updateReadButton();
+        alert('An error occurred while reading the information aloud.');
     };
     
-    // Cancel any ongoing speech
-    speechSynthesis.cancel();
-    
-    // Speak the text
-    speechSynthesis.speak(utterance);
+    // Start speaking
+    window.speechSynthesis.speak(utterance);
 }
 
-// Function to add pauses at punctuation for more natural speech
-function addPausesToText(text) {
-    // Replace periods, commas, etc. with pauses using SSML-like syntax
-    // Note: Web Speech API doesn't fully support SSML, but some engines recognize these patterns
-    return text
-        .replace(/\.\s+/g, '. <break time="500ms"/> ')
-        .replace(/\?\s+/g, '? <break time="500ms"/> ')
-        .replace(/\!\s+/g, '! <break time="500ms"/> ')
-        .replace(/,\s+/g, ', <break time="200ms"/> ')
-        .replace(/;\s+/g, '; <break time="300ms"/> ')
-        .replace(/:\s+/g, ': <break time="300ms"/> ');
-}
-
-// Function to stop speaking
-function stopSpeaking() {
-    if ('speechSynthesis' in window) {
-        speechSynthesis.cancel();
-        
-        // Reset button
-        const readBtn = document.getElementById('read-btn');
-        readBtn.textContent = 'Read Text Aloud';
-        readBtn.disabled = false;
+// Update read button state
+function updateReadButton() {
+    const readButton = document.getElementById('read-btn');
+    if (readButton) {
+        readButton.textContent = isSpeaking ? 'Stop Speaking' : 'Read Time Aloud';
+        readButton.style.backgroundColor = isSpeaking ? '#ff4444' : '#4CAF50';
     }
 }
 
-// Add a stop button to the UI
-function addStopSpeakingButton() {
-    const container = document.querySelector('.button-container');
+// Initialize functionality
+document.addEventListener('DOMContentLoaded', () => {
+    setupVoiceSelector();
     
-    if (container && 'speechSynthesis' in window) {
-        const stopBtn = document.createElement('button');
-        stopBtn.id = 'stop-btn';
-        stopBtn.className = 'btn btn-danger';
-        stopBtn.textContent = 'Stop Speaking';
-        stopBtn.style.display = 'none'; // Initially hidden
-        
-        container.appendChild(stopBtn);
-        
-        // Add event listener
-        stopBtn.addEventListener('click', stopSpeaking);
-        
-        // Show/hide stop button when speaking starts/ends
-        const readBtn = document.getElementById('read-btn');
-        const originalAddEventListener = readBtn.addEventListener;
-        
-        readBtn.addEventListener = function(type, listener, options) {
-            if (type === 'click') {
-                const wrappedListener = function(event) {
-                    // Show stop button when read button is clicked
-                    stopBtn.style.display = 'inline-block';
-                    listener(event);
-                };
-                return originalAddEventListener.call(this, type, wrappedListener, options);
-            }
-            return originalAddEventListener.call(this, type, listener, options);
-        };
-        
-        // Update the onend event to hide the stop button
-        const originalSetVoiceAndSpeak = window.setVoiceAndSpeak;
-        window.setVoiceAndSpeak = function(utterance, voices) {
-            const originalOnEnd = utterance.onend;
-            utterance.onend = function(event) {
-                stopBtn.style.display = 'none';
-                if (originalOnEnd) {
-                    originalOnEnd(event);
-                }
-            };
-            return originalSetVoiceAndSpeak(utterance, voices);
-        };
-    }
-}
+    // Start datetime updates
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+});
 
-// Initialize when the page loads
-window.addEventListener('load', () => {
-    if ('speechSynthesis' in window) {
-        // Pre-load voices
-        speechSynthesis.getVoices();
-        
-        // Add stop button
-        addStopSpeakingButton();
+// Handle page visibility changes
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden && isSpeaking) {
+        window.speechSynthesis.cancel();
+        isSpeaking = false;
+        updateReadButton();
     }
 });
+
+// Handle page unload
+window.addEventListener('beforeunload', () => {
+    if (isSpeaking) {
+        window.speechSynthesis.cancel();
+    }
+});
+
+// Export functions for external use
+window.textToSpeech = {
+    speak: readCurrentInfo,
+    stop: () => {
+        window.speechSynthesis.cancel();
+        isSpeaking = false;
+        updateReadButton();
+    },
+    getCurrentDateTime: updateDateTime
+};
